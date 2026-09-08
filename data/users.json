@@ -1,0 +1,17 @@
+[
+  {
+    "id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "role": "seller",
+    "username": "asstore",
+    "email": "asstore@gmail.com",
+    "password": "$2a$10$zfqx4vMkAp/qePsAiOR5sejQ0HNLIsB0FW.90rbITdtsn2HqD6j.i",
+    "shop_name": "AS Store",
+    "avatar": "/uploads/avatars/1788873038293-019bc899.png",
+    "banner": "/uploads/banners/1788873038379-9dee7534.png",
+    "balance": 0,
+    "created_at": "2026-09-08T13:09:30.006Z",
+    "is_verified": true,
+    "verification_type": "admin_grant",
+    "verification_status": "approved"
+  }
+]

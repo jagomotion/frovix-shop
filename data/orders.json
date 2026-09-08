@@ -1,0 +1,18 @@
+[
+  {
+    "order_id": "744afeb9-d129-4dbf-940c-b57964014a38",
+    "invoice_id": "INV2bcd0ba3a25",
+    "product_id": "a5a830d2-f70f-4018-8a5f-1e9a69ab590e",
+    "seller_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "buyer_name": "Zack",
+    "buyer_email": "zackrylsen@gmail.com",
+    "buyer_phone": "083115944494",
+    "amount": 2000,
+    "fee": 202,
+    "total": 2202,
+    "qris_image": "https://cdn.skyserver.web.id/s1/f25b998cb0ed0eb5.png",
+    "expired_at": "2026-09-08T14:23:14.499Z",
+    "status": "pending",
+    "created_at": "2026-09-08T13:23:13.368Z"
+  }
+]

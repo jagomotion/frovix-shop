@@ -1,0 +1,134 @@
+<%- include('partials/header') %>
+<main class="max-w-xl mx-auto px-4 py-4 flex-1 w-full flex flex-col h-[82vh]">
+  <!-- Header Chat -->
+  <div class="bg-white p-3 rounded-xl border border-neutral-200/90 flex items-center justify-between shadow-xs">
+    <div class="flex items-center gap-2.5">
+      <img src="<%= seller.avatar %>" class="w-8 h-8 rounded-full object-cover">
+      <div>
+        <div class="flex items-center gap-1">
+          <h3 class="font-bold text-xs"><%= seller.shop_name %></h3>
+          <% if (seller.is_verified) { %>
+            <i data-lucide="badge-check" class="w-3.5 h-3.5 text-sky-500 fill-sky-500 text-white"></i>
+          <% } %>
+        </div>
+        <p class="text-[9px] text-emerald-600 font-semibold">Online</p>
+      </div>
+    </div>
+    <a href="/store/<%= seller.username %>" class="p-1.5 text-neutral-400 hover:text-neutral-800"><i data-lucide="store" class="w-4 h-4"></i></a>
+  </div>
+
+  <% if (product) { %>
+    <div id="product-attachment" class="bg-white border border-neutral-200 rounded-lg p-2 my-1.5 flex items-center justify-between gap-2 shadow-xs">
+      <div class="flex items-center gap-2 truncate">
+        <img src="<%= product.thumbnail %>" class="w-8 h-8 rounded object-cover">
+        <div class="truncate">
+          <p class="text-[11px] font-semibold truncate"><%= product.title %></p>
+          <p class="text-[10px] font-bold text-neutral-600">Rp <%= (product.discount_price || product.price).toLocaleString() %></p>
+        </div>
+      </div>
+      <button onclick="clearAttachment()" class="text-neutral-400 hover:text-neutral-600 p-1"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+    </div>
+  <% } %>
+
+  <!-- Area Pesan -->
+  <div id="chat-box" class="flex-1 overflow-y-auto py-3 space-y-2.5 px-1">
+    <div id="chat-skeleton" class="space-y-2.5">
+      <div class="flex items-start gap-2">
+        <div class="w-6 h-6 rounded-full shimmer"></div>
+        <div class="w-40 h-8 rounded-xl shimmer"></div>
+      </div>
+      <div class="flex justify-end">
+        <div class="w-48 h-9 rounded-xl shimmer"></div>
+      </div>
+    </div>
+    <div id="chat-messages" class="space-y-2.5"></div>
+  </div>
+
+  <!-- Three Dots Flashing -->
+  <div id="typing-indicator" class="hidden flex items-center gap-1 px-2 py-1 text-neutral-400 text-[10px]">
+    <span>Mengirim</span>
+    <div class="flex gap-0.5 items-center">
+      <div class="w-1 h-1 bg-neutral-400 rounded-full dot-1"></div>
+      <div class="w-1 h-1 bg-neutral-400 rounded-full dot-2"></div>
+      <div class="w-1 h-1 bg-neutral-400 rounded-full dot-3"></div>
+    </div>
+  </div>
+
+  <form id="form-chat" onsubmit="sendMessage(event)" class="bg-white p-1.5 rounded-xl border border-neutral-200 flex items-center gap-1.5 shadow-xs">
+    <input type="text" id="message-input" placeholder="Tulis pesan..." class="flex-1 px-2.5 py-1.5 text-xs bg-transparent focus:outline-none" required>
+    <button type="submit" class="w-8 h-8 bg-neutral-900 text-white rounded-lg flex items-center justify-center hover:bg-neutral-800 transition">
+      <i data-lucide="arrow-up" class="w-4 h-4"></i>
+    </button>
+  </form>
+</main>
+
+<script>
+  let attachedProductId = "<%= product ? product.id : '' %>";
+  const partnerId = "<%= seller.id %>";
+  const currentUserId = "<%= currentUserId %>";
+
+  function clearAttachment() {
+    attachedProductId = '';
+    const el = document.getElementById('product-attachment');
+    if (el) el.remove();
+  }
+
+  async function fetchMessages() {
+    try {
+      const res = await fetch(`/api/chats/${partnerId}`);
+      const data = await res.json();
+      document.getElementById('chat-skeleton').classList.add('hidden');
+      const container = document.getElementById('chat-messages');
+      container.innerHTML = '';
+
+      data.chats.forEach(c => {
+        const isMe = c.sender_id === currentUserId;
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
+
+        let prodHtml = '';
+        if (c.product) {
+          prodHtml = `
+            <div class="mb-1 p-1.5 bg-neutral-50 rounded border border-neutral-100 flex items-center gap-1.5">
+              <img src="${c.product.thumbnail}" class="w-6 h-6 rounded object-cover">
+              <span class="text-[9px] font-bold truncate max-w-[120px] text-neutral-800">${c.product.title}</span>
+            </div>`;
+        }
+
+        msgDiv.innerHTML = `
+          <div class="max-w-[75%] ${isMe ? 'bg-neutral-900 text-white rounded-xl rounded-br-none' : 'bg-white border border-neutral-200 text-neutral-900 rounded-xl rounded-bl-none'} p-2.5 text-xs">
+            ${prodHtml}
+            <p>${c.message}</p>
+          </div>
+        `;
+        container.appendChild(msgDiv);
+      });
+      lucide.createIcons();
+    } catch(e){}
+  }
+
+  async function sendMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('message-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    input.value = '';
+    const typing = document.getElementById('typing-indicator');
+    typing.classList.remove('hidden');
+
+    await fetch('/api/chats/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ receiver_id: partnerId, message: msg, product_id: attachedProductId })
+    });
+
+    clearAttachment();
+    typing.classList.add('hidden');
+    fetchMessages();
+  }
+
+  fetchMessages();
+  setInterval(fetchMessages, 4000);
+</script>
+<%- include('partials/footer') %>

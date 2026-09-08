@@ -1,0 +1,41 @@
+<%- include('partials/header') %>
+<main class="max-w-sm mx-auto px-4 py-16 flex-1 w-full">
+  <div class="bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
+    <div class="flex items-center gap-2 mb-4">
+      <div class="w-7 h-7 bg-neutral-900 text-white rounded-lg flex items-center justify-center">
+        <i data-lucide="shield-check" class="w-4 h-4"></i>
+      </div>
+      <h2 class="text-xl font-bold">Admin FROVIX</h2>
+    </div>
+
+    <form action="/admin/login" method="POST" class="space-y-3">
+      <div>
+        <label class="text-xs font-medium text-neutral-600">Username Admin</label>
+        <input 
+          type="text" 
+          name="username" 
+          required 
+          placeholder="admin" 
+          class="w-full border border-neutral-300 rounded-lg p-2.5 text-sm mt-1 focus:outline-none focus:border-neutral-900"
+        >
+      </div>
+      <div>
+        <label class="text-xs font-medium text-neutral-600">Password</label>
+        <input 
+          type="password" 
+          name="password" 
+          required 
+          placeholder="••••••••" 
+          class="w-full border border-neutral-300 rounded-lg p-2.5 text-sm mt-1 focus:outline-none focus:border-neutral-900"
+        >
+      </div>
+      <button 
+        type="submit" 
+        class="w-full bg-neutral-900 hover:bg-neutral-800 text-white py-2.5 rounded-lg text-sm font-semibold transition"
+      >
+        Masuk Admin
+      </button>
+    </form>
+  </div>
+</main>
+<%- include('partials/footer') %>

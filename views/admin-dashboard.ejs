@@ -1,0 +1,83 @@
+<%- include('partials/header') %>
+<main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full space-y-4">
+  <div class="flex justify-between items-center">
+    <h1 class="text-base font-bold">Admin Panel</h1>
+    <a href="/admin/reports" class="p-2 border border-neutral-200 rounded-lg text-neutral-600 hover:text-red-600 transition" title="Laporan Penipuan">
+      <i data-lucide="shield-alert" class="w-4 h-4"></i>
+    </a>
+  </div>
+
+  <!-- Widget Gateway -->
+  <div class="grid grid-cols-2 gap-3">
+    <div class="bg-white p-3.5 rounded-xl border border-neutral-200/80">
+      <p class="text-[10px] text-neutral-400 uppercase font-semibold">Saldo Nevapedia</p>
+      <p class="text-base font-extrabold text-emerald-600">Rp <%= Number(gatewayBalance.balance || 0).toLocaleString() %></p>
+    </div>
+    <div class="bg-white p-3.5 rounded-xl border border-neutral-200/80">
+      <p class="text-[10px] text-neutral-400 uppercase font-semibold">Pending</p>
+      <p class="text-base font-extrabold text-amber-600">Rp <%= Number(gatewayBalance.pending_balance || 0).toLocaleString() %></p>
+    </div>
+  </div>
+
+  <!-- Review Produk -->
+  <div class="bg-white p-5 rounded-2xl border border-neutral-200/80">
+    <h3 class="font-bold text-xs mb-3">Tinjau Produk (<%= pendingProducts.length %>)</h3>
+    <div class="divide-y divide-neutral-100">
+      <% if (pendingProducts.length === 0) { %>
+        <p class="text-xs text-neutral-400 py-2">Tidak ada antrean.</p>
+      <% } %>
+      <% pendingProducts.forEach(prod => { %>
+        <div class="py-3 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+          <div class="flex items-center gap-2.5">
+            <img src="<%= prod.thumbnail %>" class="w-12 h-12 rounded-lg object-cover">
+            <div>
+              <h4 class="font-semibold text-xs"><%= prod.title %></h4>
+              <p class="text-[10px] text-neutral-400">Rp <%= prod.price.toLocaleString() %> • <%= prod.file_original_name %></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <a href="<%= prod.file_url %>" download class="p-2 border rounded-lg text-neutral-600 hover:bg-neutral-50" title="Cek File">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            </a>
+            <a href="/admin/product/<%= prod.id %>/status/approved" class="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition flex items-center gap-1">
+              <i data-lucide="check" class="w-3.5 h-3.5"></i>
+              <span>Setujui</span>
+            </a>
+            <a href="/admin/product/<%= prod.id %>/status/rejected" class="p-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition" title="Tolak">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </a>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+
+  <!-- Kelola Centang Biru Penjual -->
+  <div class="bg-white p-5 rounded-2xl border border-neutral-200/80">
+    <h3 class="font-bold text-xs mb-3">Verifikasi Penjual</h3>
+    <div class="divide-y divide-neutral-100">
+      <% users.filter(u => u.role === 'seller').forEach(seller => { %>
+        <div class="py-2.5 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <img src="<%= seller.avatar %>" class="w-8 h-8 rounded-full object-cover">
+            <div>
+              <div class="flex items-center gap-1">
+                <span class="font-semibold text-xs"><%= seller.shop_name %></span>
+                <% if (seller.is_verified) { %>
+                  <i data-lucide="badge-check" class="w-3.5 h-3.5 text-sky-500 fill-sky-500 text-white"></i>
+                <% } %>
+              </div>
+              <p class="text-[9px] text-neutral-400">@<%= seller.username %></p>
+            </div>
+          </div>
+          <form action="/admin/seller/<%= seller.id %>/toggle-badge" method="POST">
+            <button type="submit" class="px-2.5 py-1 rounded-md text-[11px] font-semibold <%= seller.is_verified ? 'border border-red-200 text-red-600 hover:bg-red-50' : 'border border-sky-200 text-sky-600 hover:bg-sky-50' %>">
+              <%= seller.is_verified ? 'Cabut' : 'Beri Badge' %>
+            </button>
+          </form>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+</main>
+<%- include('partials/footer') %>

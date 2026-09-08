@@ -1,0 +1,99 @@
+[
+  {
+    "id": "168966b2-bef4-4487-8413-70aa30e9be2a",
+    "sender_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "receiver_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "message": "Uy",
+    "product": {
+      "id": "a5a830d2-f70f-4018-8a5f-1e9a69ab590e",
+      "title": "Test produk",
+      "price": 2000,
+      "thumbnail": "/uploads/thumbnails/1788873166450-799aed29.png"
+    },
+    "created_at": "2026-09-08T13:54:28.109Z"
+  },
+  {
+    "id": "1036dedf-a9ba-4989-b542-b367c8e61353",
+    "sender_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "receiver_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "message": "Ini scam ga oi",
+    "product": null,
+    "created_at": "2026-09-08T13:54:39.575Z"
+  },
+  {
+    "id": "b56f2324-e261-4c6e-bceb-66c1fac00691",
+    "sender_id": "mkZGBOm46EucDGtRN-53UCjDRcH1HlTI",
+    "receiver_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "message": "Min ini Masi ada ga",
+    "product": {
+      "id": "a5a830d2-f70f-4018-8a5f-1e9a69ab590e",
+      "title": "Test produk",
+      "price": 2000,
+      "thumbnail": "/uploads/thumbnails/1788873166450-799aed29.png"
+    },
+    "created_at": "2026-09-08T14:06:10.332Z"
+  },
+  {
+    "id": "daade60d-b834-465f-adf9-94934959e859",
+    "sender_id": "_Jl9tpZ6YuMocDXO56A6SXsQ7HdDKSww",
+    "receiver_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "message": "Min",
+    "product": {
+      "id": "a5a830d2-f70f-4018-8a5f-1e9a69ab590e",
+      "title": "Test produk",
+      "price": 2000,
+      "thumbnail": "/uploads/thumbnails/1788873166450-799aed29.png"
+    },
+    "created_at": "2026-09-08T14:13:48.960Z"
+  },
+  {
+    "id": "7d19e8ae-2fb1-4437-9d97-be89ba2519f3",
+    "sender_id": "sJujJJt3fiSjX44ObTAFXFPMnN3AZruh",
+    "receiver_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "message": "Miiin",
+    "product": null,
+    "created_at": "2026-09-08T14:14:31.684Z"
+  },
+  {
+    "id": "379334cf-8618-4004-93c5-4ec28d84c9a1",
+    "sender_id": "0MKHfbA_HkisPUzsvNF_-G9xLzh0QTpp",
+    "receiver_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "message": "Mimin jelek",
+    "product": {
+      "id": "a5a830d2-f70f-4018-8a5f-1e9a69ab590e",
+      "title": "Test produk",
+      "price": 2000,
+      "thumbnail": "/uploads/thumbnails/1788873166450-799aed29.png"
+    },
+    "created_at": "2026-09-08T14:15:09.575Z"
+  },
+  {
+    "id": "9e260ebc-497a-4c8c-b894-baec2c82d7a6",
+    "sender_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "receiver_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "message": "Uii",
+    "product": null,
+    "created_at": "2026-09-08T14:16:51.106Z"
+  },
+  {
+    "id": "ec6fdbbf-569f-4d27-9b5f-7b8da02e61cf",
+    "sender_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "receiver_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "message": "P",
+    "product": null,
+    "created_at": "2026-09-08T14:19:42.754Z"
+  },
+  {
+    "id": "5d466a62-c391-4457-b810-29af12d04bf8",
+    "sender_id": "vkWxni5hfJLLcmWuPQBz15-IGeifVALQ",
+    "receiver_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "message": "P",
+    "product": {
+      "id": "a5a830d2-f70f-4018-8a5f-1e9a69ab590e",
+      "title": "Test produk",
+      "price": 2000,
+      "thumbnail": "/uploads/thumbnails/1788873166450-799aed29.png"
+    },
+    "created_at": "2026-09-08T14:23:23.419Z"
+  }
+]

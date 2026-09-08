@@ -1,0 +1,48 @@
+<%- include('partials/header') %>
+<main class="max-w-md mx-auto px-4 py-10 flex-1 w-full">
+  <div class="bg-white p-6 rounded-2xl border border-neutral-200/90 text-center shadow-xs">
+    <div class="flex items-center justify-center gap-1.5 text-[11px] font-bold tracking-wider text-neutral-400 uppercase mb-1">
+      <i data-lucide="qr-code" class="w-3.5 h-3.5"></i> Scan QRIS
+    </div>
+    <h2 class="text-sm font-bold truncate px-2"><%= product.title %></h2>
+
+    <div class="my-5 inline-block p-3 border border-neutral-200 rounded-xl bg-white shadow-xs">
+      <img src="<%= order.qris_image %>" class="w-56 h-56 mx-auto object-contain">
+    </div>
+
+    <div class="bg-neutral-50 rounded-xl p-3 text-xs space-y-1.5 text-left mb-4 border border-neutral-100">
+      <div class="flex justify-between text-neutral-500">
+        <span>Harga</span>
+        <span class="font-medium text-neutral-800">Rp <%= order.amount.toLocaleString() %></span>
+      </div>
+      <div class="flex justify-between text-neutral-500">
+        <span>Biaya Layanan</span>
+        <span class="font-medium text-neutral-800">Rp <%= order.fee.toLocaleString() %></span>
+      </div>
+      <div class="flex justify-between border-t border-neutral-200 pt-1.5 text-xs font-bold text-neutral-900">
+        <span>Total</span>
+        <span>Rp <%= order.total.toLocaleString() %></span>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-center gap-2 text-xs text-neutral-400">
+      <i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i>
+      <span>Menunggu pembayaran...</span>
+    </div>
+  </div>
+</main>
+
+<script>
+  const orderId = "<%= order.order_id %>";
+  const poll = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/check-payment/${orderId}`);
+      const data = await res.json();
+      if (data.status === 'paid') {
+        clearInterval(poll);
+        window.location.href = `/order/success/${orderId}`;
+      }
+    } catch(e){}
+  }, 3000);
+</script>
+<%- include('partials/footer') %>

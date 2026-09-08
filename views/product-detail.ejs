@@ -1,0 +1,136 @@
+<%- include('partials/header') %>
+<main class="max-w-5xl mx-auto px-4 py-6 flex-1 w-full">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- Kolom Kiri -->
+    <div class="md:col-span-2 space-y-4">
+      <div class="bg-white rounded-2xl border border-neutral-200/80 overflow-hidden">
+        <img src="<%= product.thumbnail %>" class="w-full aspect-video object-cover">
+        <div class="p-5">
+          <div class="flex justify-between items-start gap-3">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-neutral-400"><%= product.category %></span>
+              <h1 class="text-lg font-bold text-neutral-900 mt-0.5"><%= product.title %></h1>
+              <div class="flex items-center gap-3 mt-2 text-xs text-neutral-500">
+                <span class="flex items-center gap-1 font-bold text-neutral-800">
+                  <i data-lucide="star" class="w-3.5 h-3.5 text-amber-500 fill-amber-500"></i> <%= avgRating %>
+                </span>
+                <span>• <%= reviews.length %> ulasan</span>
+                <span class="flex items-center gap-1"><i data-lucide="file-archive" class="w-3.5 h-3.5"></i> File Digital</span>
+              </div>
+            </div>
+            <button onclick="document.getElementById('reportModal').classList.remove('hidden')" class="p-2 text-neutral-400 hover:text-red-600 rounded-lg hover:bg-neutral-50" title="Laporkan Penipuan">
+              <i data-lucide="flag" class="w-4 h-4"></i>
+            </button>
+          </div>
+          
+          <div class="mt-4 border-t border-neutral-100 pt-3">
+            <p class="text-neutral-600 text-xs leading-relaxed whitespace-pre-line"><%= product.description %></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toko Bar -->
+      <a href="/store/<%= seller.username %>" class="flex items-center justify-between bg-white p-3.5 rounded-xl border border-neutral-200/80 hover:border-neutral-300 transition">
+        <div class="flex items-center gap-3">
+          <img src="<%= seller.avatar %>" class="w-9 h-9 rounded-full object-cover">
+          <div>
+            <div class="flex items-center gap-1">
+              <p class="text-xs font-bold text-neutral-900"><%= seller.shop_name %></p>
+              <% if (seller.is_verified) { %>
+                <i data-lucide="badge-check" class="w-3.5 h-3.5 text-sky-500 fill-sky-500 text-white"></i>
+              <% } %>
+            </div>
+            <p class="text-[10px] text-neutral-400">@<%= seller.username %></p>
+          </div>
+        </div>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-neutral-400"></i>
+      </a>
+
+      <!-- Ulasan (Tanpa Emoji) -->
+      <div class="bg-white p-5 rounded-2xl border border-neutral-200/80 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold text-xs">Ulasan (<%= reviews.length %>)</h3>
+          <span class="text-[10px] text-neutral-400 font-medium">Terverifikasi</span>
+        </div>
+        <div class="space-y-2.5">
+          <% if (reviews.length === 0) { %>
+            <p class="text-[11px] text-neutral-400 py-2">Belum ada ulasan.</p>
+          <% } %>
+          <% reviews.forEach(r => { %>
+            <div class="border-b border-neutral-100 pb-2.5">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-semibold text-neutral-800"><%= r.buyer_name %></span>
+                <span class="text-[9px] text-neutral-400"><%= r.created_at %></span>
+              </div>
+              <div class="flex items-center gap-0.5 my-1">
+                <% for(let i=0; i<r.rating; i++) { %>
+                  <i data-lucide="star" class="w-2.5 h-2.5 text-amber-500 fill-amber-500"></i>
+                <% } %>
+              </div>
+              <p class="text-[11px] text-neutral-600"><%= r.comment %></p>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kolom Kanan: Checkout Form -->
+    <div class="md:col-span-1">
+      <div class="bg-white p-5 rounded-2xl border border-neutral-200/80 sticky top-20 space-y-3.5">
+        <div>
+          <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Harga</span>
+          <div class="flex items-baseline gap-2 mt-0.5">
+            <span class="text-xl font-extrabold text-neutral-900">Rp <%= (product.discount_price || product.price).toLocaleString() %></span>
+            <% if (product.discount_price) { %>
+              <span class="text-xs text-neutral-400 line-through">Rp <%= product.price.toLocaleString() %></span>
+            <% } %>
+          </div>
+        </div>
+
+        <form action="/buy/<%= product.id %>" method="POST" class="space-y-2.5">
+          <div>
+            <label class="text-[11px] font-semibold text-neutral-600">Nama</label>
+            <input type="text" name="buyer_name" required placeholder="Nama lengkap" class="w-full mt-1 border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-neutral-900">
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-neutral-600">Email (Pengiriman File)</label>
+            <input type="email" name="buyer_email" required placeholder="nama@email.com" class="w-full mt-1 border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-neutral-900">
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold text-neutral-600">WhatsApp</label>
+            <input type="tel" name="buyer_phone" required placeholder="08..." class="w-full mt-1 border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-neutral-900">
+          </div>
+
+          <div class="flex items-center gap-2 pt-2">
+            <button type="submit" class="flex-1 bg-neutral-900 hover:bg-neutral-800 text-white font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 text-xs transition">
+              <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+              <span>Bayar QRIS</span>
+            </button>
+            <a href="/chat/store/<%= seller.id %>?productId=<%= product.id %>" class="p-2.5 border border-neutral-200 text-neutral-700 hover:bg-neutral-100 rounded-lg transition" title="Tanya Produk">
+              <i data-lucide="message-square" class="w-4 h-4"></i>
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Modal Lapor -->
+<div id="reportModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+  <div class="bg-white max-w-sm w-full rounded-2xl p-5 shadow-lg">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-bold text-sm">Laporkan Masalah</h3>
+      <button onclick="document.getElementById('reportModal').classList.add('hidden')" class="text-neutral-400 hover:text-neutral-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+    <form action="/report" method="POST" class="space-y-2.5">
+      <input type="hidden" name="product_id" value="<%= product.id %>">
+      <input type="hidden" name="seller_id" value="<%= seller.id %>">
+      <input type="text" name="buyer_name" placeholder="Nama Anda" required class="w-full border rounded-lg p-2 text-xs">
+      <input type="text" name="buyer_contact" placeholder="Kontak WhatsApp / Email" required class="w-full border rounded-lg p-2 text-xs">
+      <textarea name="reason" rows="3" placeholder="Keterangan..." required class="w-full border rounded-lg p-2 text-xs"></textarea>
+      <button type="submit" class="w-full py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition">Kirim</button>
+    </form>
+  </div>
+</div>
+<%- include('partials/footer') %>

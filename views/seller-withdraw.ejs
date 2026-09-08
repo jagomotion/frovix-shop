@@ -1,0 +1,42 @@
+<%- include('partials/header') %>
+<main class="max-w-md mx-auto px-4 py-12 flex-1 w-full">
+  <div class="bg-white p-6 rounded-2xl border border-neutral-200 space-y-4">
+    <h2 class="text-lg font-bold">Penarikan Saldo Seller</h2>
+    <p class="text-xs text-neutral-500">Saldo saat ini: <b class="text-neutral-900">Rp <%= Number(seller.balance || 0).toLocaleString() %></b></p>
+
+    <form action="/seller/withdraw" method="POST" class="space-y-3">
+      <div>
+        <label class="text-xs font-semibold">Nominal Tarik</label>
+        <input type="number" name="amount" min="10000" required placeholder="50000" class="w-full border rounded-lg p-2 text-sm mt-1">
+      </div>
+      <div>
+        <label class="text-xs font-semibold">Pilih Metode</label>
+        <select name="method" required class="w-full border rounded-lg p-2 text-sm mt-1">
+          <optgroup label="Metode Manual">
+            <% (methods.manual_methods || []).forEach(m => { %>
+              <option value="<%= m.method %>"><%= m.name %> (Fee: Rp <%= m.fee %>)</option>
+            <% }) %>
+          </optgroup>
+          <optgroup label="Metode Instan">
+            <% (methods.instant_methods || []).forEach(m => { %>
+              <option value="<%= m.method %>"><%= m.name %> (Instan - Fee: Rp <%= m.fee %>)</option>
+            <% }) %>
+          </optgroup>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-semibold">Jenis Penarikan</label>
+        <select name="instant" class="w-full border rounded-lg p-2 text-sm mt-1">
+          <option value="false">Proses Manual</option>
+          <option value="true">Proses Instan</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-semibold">Nomor Rekening / E-Wallet</label>
+        <input type="text" name="account_number" required placeholder="08123456789" class="w-full border rounded-lg p-2 text-sm mt-1">
+      </div>
+      <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm transition">Ajukan Penarikan</button>
+    </form>
+  </div>
+</main>
+<%- include('partials/footer') %>

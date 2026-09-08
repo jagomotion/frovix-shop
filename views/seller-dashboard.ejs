@@ -1,0 +1,66 @@
+<%- include('partials/header') %>
+<main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full space-y-4">
+  <!-- Saldo & Profil -->
+  <div class="bg-white p-5 rounded-2xl border border-neutral-200/80 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+    <div class="flex items-center gap-3">
+      <img src="<%= seller.avatar %>" class="w-12 h-12 rounded-xl object-cover">
+      <div>
+        <div class="flex items-center gap-1.5">
+          <h2 class="text-sm font-bold"><%= seller.shop_name %></h2>
+          <% if (seller.is_verified) { %>
+            <i data-lucide="badge-check" class="w-4 h-4 text-sky-500 fill-sky-500 text-white"></i>
+          <% } %>
+        </div>
+        <a href="/store/<%= seller.username %>" class="text-[10px] text-neutral-400 hover:text-neutral-700">Lihat Toko</a>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-4">
+      <div>
+        <p class="text-[10px] text-neutral-400 uppercase font-semibold">Saldo</p>
+        <p class="text-lg font-extrabold text-neutral-900">Rp <%= Number(seller.balance || 0).toLocaleString() %></p>
+      </div>
+      <a href="/seller/withdraw" class="bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1 transition">
+        <i data-lucide="arrow-down-to-line" class="w-3.5 h-3.5"></i>
+        <span>Tarik</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Daftar Produk & Tombol Upload Baru -->
+  <div class="bg-white p-5 rounded-2xl border border-neutral-200/80">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="font-bold text-xs">Produk (<%= products.length %>)</h3>
+      <a href="/seller/product/add" class="bg-neutral-900 text-white px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-neutral-800 transition">
+        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+        <span>Tambah</span>
+      </a>
+    </div>
+
+    <div class="divide-y divide-neutral-100">
+      <% if (products.length === 0) { %>
+        <p class="text-xs text-neutral-400 py-4">Belum ada produk.</p>
+      <% } %>
+      <% products.forEach(prod => { %>
+        <div class="py-2.5 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <img src="<%= prod.thumbnail %>" class="w-10 h-10 rounded-lg object-cover">
+            <div>
+              <p class="text-xs font-semibold"><%= prod.title %></p>
+              <p class="text-[10px] text-neutral-400">
+                Rp <%= prod.price.toLocaleString() %> • 
+                <span class="<%= prod.status === 'approved' ? 'text-emerald-600' : 'text-amber-600' %> font-medium">
+                  <%= prod.status === 'approved' ? 'Disetujui' : 'Menunggu' %>
+                </span>
+              </p>
+            </div>
+          </div>
+          <a href="/seller/product/delete/<%= prod.id %>" onclick="return confirm('Hapus?')" class="p-1.5 text-neutral-400 hover:text-red-600 transition" title="Hapus">
+            <i data-lucide="trash" class="w-4 h-4"></i>
+          </a>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+</main>
+<%- include('partials/footer') %>

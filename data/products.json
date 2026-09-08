@@ -1,0 +1,16 @@
+[
+  {
+    "id": "a5a830d2-f70f-4018-8a5f-1e9a69ab590e",
+    "seller_id": "b3342b89-897b-41a1-ac57-e0834bbc86a6",
+    "title": "Test produk",
+    "price": 2000,
+    "discount_price": null,
+    "description": "Cihuy",
+    "category": "Web Scripts",
+    "thumbnail": "/uploads/thumbnails/1788873166450-799aed29.png",
+    "file_url": "/uploads/digital_files/1788873166579-48ca1b18.zip",
+    "file_original_name": "[UPDATE] Create Web Cahyo Premium.zip",
+    "status": "approved",
+    "created_at": "2026-09-08T13:12:46.837Z"
+  }
+]

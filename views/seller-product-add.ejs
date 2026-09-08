@@ -1,0 +1,47 @@
+<%- include('partials/header') %>
+<main class="max-w-xl mx-auto px-4 py-8 flex-1 w-full">
+  <div class="bg-white p-6 rounded-2xl border border-neutral-200">
+    <h2 class="font-bold text-lg mb-1">Upload Produk Digital</h2>
+    <p class="text-xs text-neutral-400 mb-6">Produk akan ditinjau oleh tim admin sebelum tampil di beranda.</p>
+
+    <form action="/seller/product/add" method="POST" enctype="multipart/form-data" class="space-y-4">
+      <div>
+        <label class="text-xs font-semibold">Nama Produk</label>
+        <input type="text" name="title" required placeholder="Script Website E-Commerce Full Source" class="w-full border rounded-lg p-2.5 text-sm mt-1">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs font-semibold">Harga Normal (Rp)</label>
+          <input type="number" name="price" required placeholder="50000" class="w-full border rounded-lg p-2.5 text-sm mt-1">
+        </div>
+        <div>
+          <label class="text-xs font-semibold">Harga Diskon (Opsional)</label>
+          <input type="number" name="discount_price" placeholder="35000" class="w-full border rounded-lg p-2.5 text-sm mt-1">
+        </div>
+      </div>
+      <div>
+        <label class="text-xs font-semibold">Kategori</label>
+        <select name="category" class="w-full border rounded-lg p-2.5 text-sm mt-1">
+          <option value="Web Scripts">Web Scripts / Source Code</option>
+          <option value="Tools & Bot">Automation Tools & Bot</option>
+          <option value="Templates">Templates & Themes</option>
+          <option value="Digital Assets">Asset Digital Lainnya</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-semibold">Deskripsi Lengkap</label>
+        <textarea name="description" rows="4" required placeholder="Jelaskan fitur script, persyaratan server, dll..." class="w-full border rounded-lg p-2.5 text-sm mt-1"></textarea>
+      </div>
+      <div>
+        <label class="text-xs font-semibold">Thumbnail Gambar (JPG/PNG)</label>
+        <input type="file" name="thumbnail" accept="image/*" required class="w-full border rounded-lg p-2 text-xs mt-1">
+      </div>
+      <div>
+        <label class="text-xs font-semibold">File Digital Produk (.ZIP / .RAR / dll)</label>
+        <input type="file" name="digital_file" required class="w-full border rounded-lg p-2 text-xs mt-1">
+      </div>
+      <button type="submit" class="w-full bg-neutral-900 text-white py-3 rounded-lg text-sm font-semibold">Kirim & Ajukan Tinjauan</button>
+    </form>
+  </div>
+</main>
+<%- include('partials/footer') %>
