@@ -1,3 +1,6 @@
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '1.1.1.1']);
+
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -7,58 +10,127 @@ const multer = require('multer');
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
+const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const NEVAPEDIA_KEY = process.env.NEVAPEDIA_API_KEY;
 
-// Pastikan folder data & uploads ada
-const dirs = [
-  'data',
-  'public/uploads/thumbnails',
-  'public/uploads/digital_files',
-  'public/uploads/avatars',
-  'public/uploads/banners'
-];
-dirs.forEach(d => {
-  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-});
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://frovixdb:VY8CAnBEgFgtrWxQ@cluster0.ileakho.mongodb.net/frovix_shop?retryWrites=true&w=majority&appName=Cluster0';
 
-// Inisialisasi file JSON jika belum ada
-['users', 'products', 'orders', 'reviews', 'reports'].forEach(file => {
-  const filePath = path.join(__dirname, 'data', `${file}.json`);
-  if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, JSON.stringify([]));
-});
+let isConnected = false;
+async function connectDB() {
+  if (isConnected) return;
+  try {
+    const db = await mongoose.connect(MONGODB_URI);
+    isConnected = db.connections[0].readyState === 1;
+    console.log('Db berhasil terhubung');
+  } catch (err) {
+    console.error('Error Db:', err.message);
+  }
+}
 
-// JSON Database Helper
-const db = {
-  read: (table) => JSON.parse(fs.readFileSync(path.join(__dirname, 'data', `${table}.json`), 'utf-8')),
-  write: (table, data) => fs.writeFileSync(path.join(__dirname, 'data', `${table}.json`), JSON.stringify(data, null, 2))
-};
-
-// Middleware
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'frovix_session_secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { maxAge: 1000 * 60 * 60 * 24 * 30 } // 30 hari sesi tersimpan
-}));
-
-// Variabel global untuk views
-app.use((req, res, next) => {
-  res.locals.user = req.session.user || null;
-  res.locals.isAdmin = req.session.isAdmin || false;
+// Middleware koneksi database setiap request
+app.use(async (req, res, next) => {
+  await connectDB();
   next();
 });
 
-// Konfigurasi Multer (Upload Gambar & ZIP/Script)
+/* ==========================================================
+   SCHEMA & MODEL MONGOOSE
+========================================================== */
+const UserSchema = new mongoose.Schema({
+  role: { type: String, default: 'seller' },
+  username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  shop_name: { type: String, default: '' },
+  avatar: { type: String, default: '/uploads/avatars/default.png' },
+  banner: { type: String, default: '/uploads/banners/default.jpg' },
+  balance: { type: Number, default: 0 },
+  is_verified: { type: Boolean, default: false },
+  verification_status: { type: String, default: 'none' }, // 'none', 'pending', 'approved'
+  verification_type: { type: String, default: null },     // 'auto_qualified', 'admin_grant'
+  verification_note: { type: String, default: '' }
+}, { timestamps: true });
+
+const ProductSchema = new mongoose.Schema({
+  seller_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  title: { type: String, required: true },
+  price: { type: Number, required: true },
+  discount_price: { type: Number, default: null },
+  category: { type: String, default: 'Web Scripts' },
+  description: { type: String, default: '' },
+  thumbnail: { type: String, required: true },
+  file_url: { type: String, required: true },
+  file_original_name: { type: String, default: '' },
+  status: { type: String, default: 'pending' } // 'pending', 'approved', 'rejected'
+}, { timestamps: true });
+
+const OrderSchema = new mongoose.Schema({
+  order_id: { type: String, required: true, unique: true },
+  invoice_id: { type: String, required: true },
+  product_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+  seller_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  buyer_name: { type: String, required: true },
+  buyer_email: { type: String, required: true },
+  buyer_phone: { type: String, required: true },
+  amount: { type: Number, required: true },
+  fee: { type: Number, default: 0 },
+  total: { type: Number, required: true },
+  qris_image: { type: String },
+  expired_at: { type: String },
+  status: { type: String, default: 'pending' } // 'pending', 'paid'
+}, { timestamps: true });
+
+const ReviewSchema = new mongoose.Schema({
+  product_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+  buyer_name: { type: String, default: 'Pembeli' },
+  rating: { type: Number, default: 5 },
+  comment: { type: String, default: '' }
+}, { timestamps: true });
+
+const ReportSchema = new mongoose.Schema({
+  product_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+  seller_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  buyer_name: { type: String, required: true },
+  buyer_contact: { type: String, required: true },
+  reason: { type: String, required: true }
+}, { timestamps: true });
+
+const ChatSchema = new mongoose.Schema({
+  sender_id: { type: String, required: true },
+  receiver_id: { type: String, required: true },
+  message: { type: String, required: true },
+  product: {
+    id: String,
+    title: String,
+    price: Number,
+    thumbnail: String
+  }
+}, { timestamps: true });
+
+const FollowSchema = new mongoose.Schema({
+  follower_id: { type: String, required: true },
+  seller_id: { type: String, required: true }
+}, { timestamps: true });
+
+const User = mongoose.models.User || mongoose.model('User', UserSchema);
+const Product = mongoose.models.Product || mongoose.model('Product', ProductSchema);
+const Order = mongoose.models.Order || mongoose.model('Order', OrderSchema);
+const Review = mongoose.models.Review || mongoose.model('Review', ReviewSchema);
+const Report = mongoose.models.Report || mongoose.model('Report', ReportSchema);
+const Chat = mongoose.models.Chat || mongoose.model('Chat', ChatSchema);
+const Follow = mongoose.models.Follow || mongoose.model('Follow', FollowSchema);
+
+/* ==========================================================
+   FOLDER UPLOADS & MULTI-PART SETUP
+========================================================== */
+['public/uploads/thumbnails', 'public/uploads/digital_files', 'public/uploads/avatars', 'public/uploads/banners'].forEach(dir => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+});
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     if (file.fieldname === 'thumbnail') cb(null, 'public/uploads/thumbnails');
@@ -68,24 +140,42 @@ const storage = multer.diskStorage({
     else cb(null, 'public/uploads');
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${Date.now()}-${uuidv4().slice(0, 8)}${ext}`);
+    cb(null, `${Date.now()}-${uuidv4().slice(0, 8)}${path.extname(file.originalname)}`);
   }
 });
 const upload = multer({ storage });
 
-// Konfigurasi Email
-// Konfigurasi Email
+// Email Transporter
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
   port: Number(process.env.SMTP_PORT) || 587,
-  secure: false, // true jika port 465, false jika 587
+  secure: false,
   auth: {
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || ''
   }
 });
-// Auth Middlewares
+
+// Express Config
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'frovix_session_secret_998',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 1000 * 60 * 60 * 24 * 30 }
+}));
+
+app.use((req, res, next) => {
+  res.locals.user = req.session.user || null;
+  res.locals.isAdmin = req.session.isAdmin || false;
+  next();
+});
+
 const isSeller = (req, res, next) => {
   if (req.session.user && req.session.user.role === 'seller') return next();
   res.redirect('/seller/login');
@@ -96,263 +186,163 @@ const isAdmin = (req, res, next) => {
   res.redirect('/admin/login');
 };
 
-/* ==========================================================
-   LOGIKA CENTANG BIRU (AUTO QUALIFICATION & CHECK)
-========================================================== */
-function checkAndApplyAutoVerification(sellerId) {
-  const users = db.read('users');
-  const orders = db.read('orders');
-  const reviews = db.read('reviews');
-  const products = db.read('products');
+// Logika Verifikasi Otomatis
+async function checkAndApplyAutoVerification(sellerId) {
+  try {
+    const seller = await User.findById(sellerId);
+    if (!seller || seller.is_verified) return;
 
-  const sellerIdx = users.findIndex(u => u.id === sellerId);
-  if (sellerIdx === -1) return;
+    const successOrdersCount = await Order.countDocuments({ seller_id: sellerId, status: 'paid' });
+    const sellerProducts = await Product.find({ seller_id: sellerId }).select('_id');
+    const prodIds = sellerProducts.map(p => p._id);
 
-  const seller = users[sellerIdx];
-  if (seller.is_verified) return; // Sudah centang biru
+    const reviews = await Review.find({ product_id: { $in: prodIds } });
+    const avgRating = reviews.length ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) : 0;
 
-  // Syarat Otomatis: Minimal 5 penjualan sukses & rata-rata rating >= 4.5
-  const sellerProductIds = products.filter(p => p.seller_id === sellerId).map(p => p.id);
-  const successOrders = orders.filter(o => o.seller_id === sellerId && o.status === 'paid').length;
-  
-  const sellerReviews = reviews.filter(r => sellerProductIds.includes(r.product_id));
-  const avgRating = sellerReviews.length 
-    ? (sellerReviews.reduce((sum, r) => sum + Number(r.rating), 0) / sellerReviews.length)
-    : 0;
-
-  if (successOrders >= 5 && avgRating >= 4.5) {
-    users[sellerIdx].is_verified = true;
-    users[sellerIdx].verification_type = 'auto_qualified';
-    db.write('users', users);
+    if (successOrdersCount >= 5 && avgRating >= 4.5) {
+      seller.is_verified = true;
+      seller.verification_type = 'auto_qualified';
+      await seller.save();
+    }
+  } catch (e) {
+    console.error('Auto verify error:', e.message);
   }
 }
-
-/* ==========================================================
-   SISTEM FOLLOW & UNFOLLOW TOKO
-========================================================== */
-app.post('/api/store/:sellerId/toggle-follow', (req, res) => {
-  const currentUserId = req.session.user ? req.session.user.id : (req.sessionID || 'guest_user');
-  const { sellerId } = req.params;
-
-  let follows = db.read('follows');
-  const existingIndex = follows.findIndex(f => f.follower_id === currentUserId && f.seller_id === sellerId);
-
-  let isFollowing = false;
-  if (existingIndex > -1) {
-    follows.splice(existingIndex, 1); // Unfollow
-  } else {
-    follows.push({ id: uuidv4(), follower_id: currentUserId, seller_id: sellerId, created_at: new Date() });
-    isFollowing = true;
-  }
-  db.write('follows', follows);
-
-  const totalFollowers = follows.filter(f => f.seller_id === sellerId).length;
-  res.json({ success: true, isFollowing, totalFollowers });
-});
-
-/* ==========================================================
-   PENGAJUAN & KELOLA CENTANG BIRU OLEH ADMIN / SELLER
-========================================================== */
-// Seller mengajukan verifikasi centang biru
-app.post('/seller/request-verification', isSeller, (req, res) => {
-  const users = db.read('users');
-  const idx = users.findIndex(u => u.id === req.session.user.id);
-  if (idx !== -1) {
-    users[idx].verification_status = 'pending';
-    users[idx].verification_note = req.body.note || 'Pengajuan verifikasi portofolio toko';
-    db.write('users', users);
-    req.session.user = users[idx];
-  }
-  res.redirect('/seller/dashboard');
-});
-
-// Admin memberikan / mencabut centang biru (Manual Grant)
-app.post('/admin/seller/:id/toggle-badge', isAdmin, (req, res) => {
-  const users = db.read('users');
-  const idx = users.findIndex(u => u.id === req.params.id);
-  if (idx !== -1) {
-    users[idx].is_verified = !users[idx].is_verified;
-    users[idx].verification_type = users[idx].is_verified ? 'admin_grant' : null;
-    users[idx].verification_status = users[idx].is_verified ? 'approved' : 'none';
-    db.write('users', users);
-  }
-  res.redirect('/admin/dashboard');
-});
-
-/* ==========================================================
-   SISTEM CHAT DENGAN TOKO (DENGAN REFERENSI PRODUK)
-========================================================== */
-// Halaman List Chat
-app.get('/chat', (req, res) => {
-  const currentUserId = req.session.user ? req.session.user.id : req.sessionID;
-  const chats = db.read('chats');
-  const users = db.read('users');
-
-  // Cari kontak yang pernah bertukar pesan
-  const userChats = chats.filter(c => c.sender_id === currentUserId || c.receiver_id === currentUserId);
-  const contactIds = [...new Set(userChats.map(c => c.sender_id === currentUserId ? c.receiver_id : c.sender_id))];
-  const contacts = users.filter(u => contactIds.includes(u.id));
-
-  res.render('chat-list', { contacts });
-});
-
-// Buka Ruang Chat dengan Toko Spesifik & Produk Terlampir
-app.get('/chat/store/:sellerId', (req, res) => {
-  const { sellerId } = req.params;
-  const { productId } = req.query;
-
-  const seller = db.read('users').find(u => u.id === sellerId);
-  if (!seller) return res.status(404).send('Toko tidak ditemukan');
-
-  const product = productId ? db.read('products').find(p => p.id === productId) : null;
-  const currentUserId = req.session.user ? req.session.user.id : req.sessionID;
-
-  res.render('chat-room', { seller, product, currentUserId });
-});
-
-// API Ambil Riwayat Pesan (untuk Skeleton Chat Loader & Polling)
-app.get('/api/chats/:partnerId', (req, res) => {
-  const currentUserId = req.session.user ? req.session.user.id : req.sessionID;
-  const partnerId = req.params.partnerId;
-
-  const chats = db.read('chats').filter(c => 
-    (c.sender_id === currentUserId && c.receiver_id === partnerId) ||
-    (c.sender_id === partnerId && c.receiver_id === currentUserId)
-  );
-
-  res.json({ success: true, chats });
-});
-
-// API Kirim Pesan
-app.post('/api/chats/send', (req, res) => {
-  const currentUserId = req.session.user ? req.session.user.id : req.sessionID;
-  const { receiver_id, message, product_id } = req.body;
-
-  if (!message || !message.trim()) return res.status(400).json({ error: 'Pesan kosong' });
-
-  const chats = db.read('chats');
-  const product = product_id ? db.read('products').find(p => p.id === product_id) : null;
-
-  const newChat = {
-    id: uuidv4(),
-    sender_id: currentUserId,
-    receiver_id,
-    message: message.trim(),
-    product: product ? { id: product.id, title: product.title, price: product.price, thumbnail: product.thumbnail } : null,
-    created_at: new Date().toISOString()
-  };
-
-  chats.push(newChat);
-  db.write('chats', chats);
-
-  res.json({ success: true, chat: newChat });
-});
-
 
 /* ==========================================================
    PUBLIC & BUYER ROUTES
 ========================================================== */
 
-// 1. Home - List Produk & Info Seller
-app.get('/', (req, res) => {
-  const products = db.read('products').filter(p => p.status === 'approved');
-  const users = db.read('users');
-  const reviews = db.read('reviews');
-  const sellers = users.filter(u => u.role === 'seller');
+// 1. Home
+app.get('/', async (req, res) => {
+  try {
+    const products = await Product.find({ status: 'approved' }).populate('seller_id').lean();
+    const reviews = await Review.find().lean();
+    const totalSellers = await User.countDocuments({ role: 'seller' });
 
-  const enrichedProducts = products.map(prod => {
-    const seller = sellers.find(s => s.id === prod.seller_id) || {};
-    const prodReviews = reviews.filter(r => r.product_id === prod.id);
-    const prodAvgRating = prodReviews.length 
-      ? (prodReviews.reduce((acc, r) => acc + Number(r.rating), 0) / prodReviews.length).toFixed(1) 
+    const enrichedProducts = products.map(prod => {
+      const seller = prod.seller_id || {};
+      const prodReviews = reviews.filter(r => r.product_id.toString() === prod._id.toString());
+      const prodAvgRating = prodReviews.length 
+        ? (prodReviews.reduce((acc, r) => acc + Number(r.rating), 0) / prodReviews.length).toFixed(1) 
+        : '0.0';
+
+      return {
+        ...prod,
+        id: prod._id.toString(),
+        shop_name: seller.shop_name || 'Toko Frovix',
+        seller_username: seller.username || '',
+        shop_avatar: seller.avatar || '/uploads/avatars/default.png',
+        product_rating: prodAvgRating,
+        product_reviews_count: prodReviews.length,
+        is_verified: seller.is_verified || false
+      };
+    });
+
+    res.render('index', {
+      products: enrichedProducts,
+      totalSellers,
+      totalProducts: products.length
+    });
+  } catch (err) {
+    res.status(500).send('Database Error: ' + err.message);
+  }
+});
+
+// 2. Detail Produk
+app.get('/product/:id', async (req, res) => {
+  try {
+    const product = await Product.findOne({ _id: req.params.id, status: 'approved' }).populate('seller_id').lean();
+    if (!product) return res.status(404).send('Produk tidak ditemukan');
+
+    const seller = product.seller_id || {};
+    const reviews = await Review.find({ product_id: product._id }).sort({ createdAt: -1 }).lean();
+    const avgRating = reviews.length 
+      ? (reviews.reduce((acc, r) => acc + Number(r.rating), 0) / reviews.length).toFixed(1) 
       : '0.0';
 
-    const sellerProds = products.filter(p => p.seller_id === seller.id).map(p => p.id);
-    const sellerReviews = reviews.filter(r => sellerProds.includes(r.product_id));
-    const shopAvgRating = sellerReviews.length 
+    res.render('product-detail', { 
+      product: { ...product, id: product._id.toString() }, 
+      seller: { ...seller, id: seller._id ? seller._id.toString() : '' }, 
+      reviews, 
+      avgRating 
+    });
+  } catch (err) {
+    res.status(404).send('Produk tidak valid');
+  }
+});
+
+// 3. Halaman Toko Publik
+app.get('/store/:username', async (req, res) => {
+  try {
+    const seller = await User.findOne({ username: req.params.username, role: 'seller' }).lean();
+    if (!seller) return res.status(404).send('Toko tidak ditemukan');
+
+    const products = await Product.find({ seller_id: seller._id, status: 'approved' }).lean();
+    const prodIds = products.map(p => p._id);
+    const sellerReviews = await Review.find({ product_id: { $in: prodIds } }).lean();
+
+    const shopRating = sellerReviews.length 
       ? (sellerReviews.reduce((acc, r) => acc + Number(r.rating), 0) / sellerReviews.length).toFixed(1) 
       : '0.0';
 
-    return {
-      ...prod,
-      shop_name: seller.shop_name || 'Toko Frovix',
-      seller_username: seller.username || '',
-      shop_avatar: seller.avatar || '/uploads/avatars/default.png',
-      product_rating: prodAvgRating,
-      product_reviews_count: prodReviews.length,
-      shop_rating: shopAvgRating,
-      is_verified: seller.is_verified || false // <-- Memastikan centang biru seller terbawa ke produk
-    };
-  });
+    const totalFollowers = await Follow.countDocuments({ seller_id: seller._id.toString() });
+    const currentUserId = req.session.user ? req.session.user.id : (req.sessionID || 'guest');
+    const isFollowing = !!(await Follow.findOne({ follower_id: currentUserId, seller_id: seller._id.toString() }));
 
-  res.render('index', { products: enrichedProducts });
+    res.render('store', {
+      seller: { ...seller, id: seller._id.toString() },
+      products: products.map(p => ({ ...p, id: p._id.toString() })),
+      shopRating,
+      totalReviews: sellerReviews.length,
+      totalFollowers,
+      isFollowing
+    });
+  } catch (err) {
+    res.status(500).send('Error toko: ' + err.message);
+  }
 });
 
-// 2. Detail Produk & Ulasan
-app.get('/product/:id', (req, res) => {
-  const products = db.read('products');
-  const product = products.find(p => p.id === req.params.id && p.status === 'approved');
-  if (!product) return res.status(404).send('Produk tidak ditemukan atau belum disetujui');
-
-  const seller = db.read('users').find(u => u.id === product.seller_id) || {};
-  const reviews = db.read('reviews').filter(r => r.product_id === product.id);
-  const avgRating = reviews.length 
-    ? (reviews.reduce((acc, r) => acc + Number(r.rating), 0) / reviews.length).toFixed(1) 
-    : '0.0';
-
-  res.render('product-detail', { product, seller, reviews, avgRating });
-});
-
-// 3. Halaman Toko Seller Publik
-app.get('/store/:username', (req, res) => {
-  const seller = db.read('users').find(u => u.username === req.params.username && u.role === 'seller');
-  if (!seller) return res.status(404).send('Toko tidak ditemukan');
-
-  const products = db.read('products').filter(p => p.seller_id === seller.id && p.status === 'approved');
-  const reviews = db.read('reviews');
-  const sellerProdsIds = products.map(p => p.id);
-  const sellerReviews = reviews.filter(r => sellerProdsIds.includes(r.product_id));
-  const shopRating = sellerReviews.length 
-    ? (sellerReviews.reduce((acc, r) => acc + Number(r.rating), 0) / sellerReviews.length).toFixed(1) 
-    : '0.0';
-
-  // Hitung Pengikut dari follows.json
-  const follows = db.read('follows') || [];
-  const totalFollowers = follows.filter(f => f.seller_id === seller.id).length;
-  
-  const currentUserId = req.session.user ? req.session.user.id : (req.sessionID || 'guest_user');
-  const isFollowing = follows.some(f => f.follower_id === currentUserId && f.seller_id === seller.id);
-
-  res.render('store', { 
-    seller, 
-    products, 
-    shopRating, 
-    totalReviews: sellerReviews.length,
-    totalFollowers,
-    isFollowing
-  });
-});
-// 4. Proses Checkout -> Generate QRIS Nevapedia
-app.post('/buy/:productId', async (req, res) => {
-  const { buyer_name, buyer_email, buyer_phone } = req.body;
-  const product = db.read('products').find(p => p.id === req.params.productId);
-  if (!product) return res.status(404).json({ error: 'Produk tidak valid' });
-
-  const finalAmount = product.discount_price ? Number(product.discount_price) : Number(product.price);
-
+// 4. Follow Toko Toggle
+app.post('/api/store/:sellerId/toggle-follow', async (req, res) => {
   try {
-    // Panggil API Invoice Nevapedia
+    const currentUserId = req.session.user ? req.session.user.id : (req.sessionID || 'guest');
+    const { sellerId } = req.params;
+
+    const existing = await Follow.findOne({ follower_id: currentUserId, seller_id: sellerId });
+    let isFollowing = false;
+
+    if (existing) {
+      await Follow.deleteOne({ _id: existing._id });
+    } else {
+      await Follow.create({ follower_id: currentUserId, seller_id: sellerId });
+      isFollowing = true;
+    }
+
+    const totalFollowers = await Follow.countDocuments({ seller_id: sellerId });
+    res.json({ success: true, isFollowing, totalFollowers });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Beli & Buat QRIS Nevapedia
+app.post('/buy/:productId', async (req, res) => {
+  try {
+    const { buyer_name, buyer_email, buyer_phone } = req.body;
+    const product = await Product.findById(req.params.productId);
+    if (!product) return res.status(404).send('Produk tidak ditemukan');
+
+    const finalAmount = product.discount_price ? Number(product.discount_price) : Number(product.price);
     const response = await axios.get(`https://app.nevapedia.com/api/invoice?apikey=${NEVAPEDIA_KEY}&amount=${finalAmount}`);
     const data = response.data;
 
-    if (!data.success && !data.invoice_id) {
-      return res.status(400).send('Gagal membuat tagihan QRIS ke Nevapedia.');
-    }
+    if (!data.invoice_id) return res.status(400).send('Gagal generate invoice QRIS');
 
-    const newOrder = {
+    const order = await Order.create({
       order_id: uuidv4(),
       invoice_id: data.invoice_id,
-      product_id: product.id,
+      product_id: product._id,
       seller_id: product.seller_id,
       buyer_name,
       buyer_email,
@@ -362,80 +352,62 @@ app.post('/buy/:productId', async (req, res) => {
       total: data.total,
       qris_image: data.qris_image,
       expired_at: data.expired_at,
-      status: 'pending',
-      created_at: new Date().toISOString()
-    };
+      status: 'pending'
+    });
 
-    const orders = db.read('orders');
-    orders.push(newOrder);
-    db.write('orders', orders);
-
-    res.redirect(`/checkout/${newOrder.order_id}`);
+    res.redirect(`/checkout/${order.order_id}`);
   } catch (err) {
-    console.error('Error create invoice:', err.message);
-    res.status(500).send('Terjadi kesalahan pada Payment Gateway.');
+    res.status(500).send('Error gateway: ' + err.message);
   }
 });
 
-// 5. Tampilan Halaman Bayar QRIS
-app.get('/checkout/:orderId', (req, res) => {
-  const order = db.read('orders').find(o => o.order_id === req.params.orderId);
-  if (!order) return res.status(404).send('Order tidak ditemukan');
-
-  const product = db.read('products').find(p => p.id === order.product_id);
-  res.render('checkout', { order, product });
-});
-
-// 6. Polling Cek Status Pembayaran QRIS (Frontend Ajax)
-app.get('/api/check-payment/:orderId', async (req, res) => {
-  const orders = db.read('orders');
-  const orderIndex = orders.findIndex(o => o.order_id === req.params.orderId);
-  if (orderIndex === -1) return res.status(404).json({ error: 'Not found' });
-
-  const order = orders[orderIndex];
-
-  // Jika sudah paid di database lokal
-  if (order.status === 'paid') {
-  
-    return res.json({ status: 'paid', download_token: order.order_id });
-  }
-
+// 6. Tampilan Checkout QRIS
+app.get('/checkout/:orderId', async (req, res) => {
   try {
+    const order = await Order.findOne({ order_id: req.params.orderId });
+    if (!order) return res.status(404).send('Pesanan tidak ada');
+
+    const product = await Product.findById(order.product_id);
+    res.render('checkout', { order, product });
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// 7. Polling Pembayaran QRIS
+app.get('/api/check-payment/:orderId', async (req, res) => {
+  try {
+    const order = await Order.findOne({ order_id: req.params.orderId });
+    if (!order) return res.status(404).json({ error: 'Not found' });
+
+    if (order.status === 'paid') {
+      return res.json({ status: 'paid', download_token: order.order_id });
+    }
+
     const resp = await axios.get(`https://app.nevapedia.com/api/invoice/status?apikey=${NEVAPEDIA_KEY}&invoice_id=${order.invoice_id}`);
     const data = resp.data;
 
     if (data.status === 'paid') {
-checkAndApplyAutoVerification(order.seller_id);
-      orders[orderIndex].status = 'paid';
-      db.write('orders', orders);
+      order.status = 'paid';
+      await order.save();
 
-      // Tambahkan saldo bersih ke akun Seller
-      const users = db.read('users');
-      const sellerIdx = users.findIndex(u => u.id === order.seller_id);
-      if (sellerIdx !== -1) {
-        users[sellerIdx].balance = (users[sellerIdx].balance || 0) + order.amount;
-        db.write('users', users);
-      }
+      // Tambah Saldo ke Seller
+      await User.findByIdAndUpdate(order.seller_id, { $inc: { balance: order.amount } });
+      await checkAndApplyAutoVerification(order.seller_id);
 
-      // Kirim file digital & link ke email buyer
-      const product = db.read('products').find(p => p.id === order.product_id);
+      // Kirim Notifikasi Email
+      const product = await Product.findById(order.product_id);
       const downloadLink = `${req.protocol}://${req.get('host')}/download/${order.order_id}`;
 
       try {
         await transporter.sendMail({
           from: `"FROVIX SHOP" <${process.env.SMTP_USER}>`,
           to: order.buyer_email,
-          subject: `Pembayaran Berhasil - File Digital: ${product.title}`,
-          html: `
-            <h3>Halo ${order.buyer_name}, Terimakasih telah membeli di FROVIX SHOP!</h3>
-            <p>Pembayaran sebesar <b>Rp ${order.total.toLocaleString()}</b> telah berhasil kami terima.</p>
-            <p>Produk: <b>${product.title}</b></p>
-            <p>Silakan klik link berikut untuk mendownload file produk Anda:</p>
-            <p><a href="${downloadLink}" style="background:#000;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">Download Produk Sekarang</a></p>
-          `
+          subject: `Pesanan Berhasil: ${product.title}`,
+          html: `<p>Halo ${order.buyer_name}, pembayaran berhasil!</p><p><a href="${downloadLink}">Download File Produk</a></p>`
         });
-      } catch (mailErr) {
-        console.log('Kirim email gagal/lewati jika smtp belum diset:', mailErr.message);
+      } catch (mErr) {
+        console.log('SMTP error:', mErr.message);
       }
 
       return res.json({ status: 'paid', download_token: order.order_id });
@@ -447,22 +419,23 @@ checkAndApplyAutoVerification(order.seller_id);
   }
 });
 
-// 7. Sukses Bayar & Halaman Unduh
-app.get('/order/success/:orderId', (req, res) => {
-  const order = db.read('orders').find(o => o.order_id === req.params.orderId);
-  if (!order || order.status !== 'paid') return res.redirect('/');
+// 8. Sukses Pembayaran
+app.get('/order/success/:orderId', async (req, res) => {
+  const order = await Order.findOne({ order_id: req.params.orderId, status: 'paid' });
+  if (!order) return res.redirect('/');
 
-  const product = db.read('products').find(p => p.id === order.product_id);
+  const product = await Product.findById(order.product_id);
   res.render('payment-success', { order, product });
 });
 
-// 8. Download File Digital
-app.get('/download/:orderId', (req, res) => {
-  const order = db.read('orders').find(o => o.order_id === req.params.orderId);
-  if (!order || order.status !== 'paid') return res.status(403).send('Akses download ditolak.');
+// 9. Download File
+app.get('/download/:orderId', async (req, res) => {
+  const order = await Order.findOne({ order_id: req.params.orderId, status: 'paid' });
+  if (!order) return res.status(403).send('Akses download ditolak');
 
-  const product = db.read('products').find(p => p.id === order.product_id);
+  const product = await Product.findById(order.product_id);
   const filePath = path.join(__dirname, 'public', product.file_url);
+
   if (fs.existsSync(filePath)) {
     res.download(filePath);
   } else {
@@ -470,85 +443,149 @@ app.get('/download/:orderId', (req, res) => {
   }
 });
 
-// 9. Beri Ulasan & Rating
-app.post('/product/:productId/review', (req, res) => {
-  const { buyer_name, rating, comment } = req.body;
-  const reviews = db.read('reviews');
-  reviews.push({
-    id: uuidv4(),
-    product_id: req.params.productId,
-    buyer_name: buyer_name || 'Pembeli Frovix',
-    rating: Number(rating) || 5,
-    comment: comment || '',
-    created_at: new Date().toLocaleDateString('id-ID')
-  });
-  db.write('reviews', reviews);
-  res.redirect(`/product/${req.params.productId}`);
+// 10. Tambah Review
+app.post('/product/:productId/review', async (req, res) => {
+  try {
+    await Review.create({
+      product_id: req.params.productId,
+      buyer_name: req.body.buyer_name || 'Pembeli',
+      rating: Number(req.body.rating) || 5,
+      comment: req.body.comment || ''
+    });
+    res.redirect(`/product/${req.params.productId}`);
+  } catch (err) {
+    res.redirect('back');
+  }
 });
 
-// 10. Laporkan Seller/Produk (Anti-Scam)
-app.post('/report', (req, res) => {
-  const { product_id, seller_id, buyer_name, buyer_contact, reason } = req.body;
-  const reports = db.read('reports');
-  reports.push({
-    id: uuidv4(),
-    product_id,
-    seller_id,
-    buyer_name,
-    buyer_contact,
-    reason,
-    created_at: new Date().toISOString()
-  });
-  db.write('reports', reports);
-  res.send('<script>alert("Laporan penipuan Anda berhasil dikirim ke Admin FROVIX."); window.history.back();</script>');
+// 11. Laporkan Seller / Produk
+app.post('/report', async (req, res) => {
+  try {
+    await Report.create({
+      product_id: req.body.product_id,
+      seller_id: req.body.seller_id,
+      buyer_name: req.body.buyer_name,
+      buyer_contact: req.body.buyer_contact,
+      reason: req.body.reason
+    });
+    res.send('<script>alert("Laporan Anda telah terkirim ke Admin."); window.history.back();</script>');
+  } catch (err) {
+    res.send('<script>alert("Gagal kirim laporan"); window.history.back();</script>');
+  }
 });
 
 /* ==========================================================
-   SELLER AUTH & DASHBOARD ROUTES
+   FITUR CHAT
 ========================================================== */
+app.get('/chat', async (req, res) => {
+  const currentUserId = req.session.user ? req.session.user.id : req.sessionID;
+  const userChats = await Chat.find({
+    $or: [{ sender_id: currentUserId }, { receiver_id: currentUserId }]
+  }).lean();
 
+  const partnerIds = [...new Set(userChats.map(c => c.sender_id === currentUserId ? c.receiver_id : c.sender_id))];
+  const contacts = await User.find({ _id: { $in: partnerIds } }).lean();
+
+  res.render('chat-list', { contacts: contacts.map(c => ({ ...c, id: c._id.toString() })) });
+});
+
+app.get('/chat/store/:sellerId', async (req, res) => {
+  try {
+    const seller = await User.findById(req.params.sellerId).lean();
+    if (!seller) return res.status(404).send('Toko tidak ada');
+
+    const product = req.query.productId ? await Product.findById(req.query.productId).lean() : null;
+    const currentUserId = req.session.user ? req.session.user.id : req.sessionID;
+
+    res.render('chat-room', { 
+      seller: { ...seller, id: seller._id.toString() }, 
+      product: product ? { ...product, id: product._id.toString() } : null, 
+      currentUserId 
+    });
+  } catch (err) {
+    res.status(404).send('Gagal membuka chat');
+  }
+});
+
+app.get('/api/chats/:partnerId', async (req, res) => {
+  const currentUserId = req.session.user ? req.session.user.id : req.sessionID;
+  const partnerId = req.params.partnerId;
+
+  const chats = await Chat.find({
+    $or: [
+      { sender_id: currentUserId, receiver_id: partnerId },
+      { sender_id: partnerId, receiver_id: currentUserId }
+    ]
+  }).sort({ createdAt: 1 }).lean();
+
+  res.json({ success: true, chats });
+});
+
+app.post('/api/chats/send', async (req, res) => {
+  try {
+    const currentUserId = req.session.user ? req.session.user.id : req.sessionID;
+    const { receiver_id, message, product_id } = req.body;
+
+    let prodData = null;
+    if (product_id) {
+      const p = await Product.findById(product_id);
+      if (p) prodData = { id: p._id.toString(), title: p.title, price: p.price, thumbnail: p.thumbnail };
+    }
+
+    const chat = await Chat.create({
+      sender_id: currentUserId,
+      receiver_id,
+      message: message.trim(),
+      product: prodData
+    });
+
+    res.json({ success: true, chat });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ==========================================================
+   SELLER AUTH & DASHBOARD
+========================================================== */
 app.get('/seller/register', (req, res) => res.render('seller-register'));
 app.post('/seller/register', async (req, res) => {
-  const { username, email, password, shop_name } = req.body;
-  const users = db.read('users');
+  try {
+    const { username, email, password, shop_name } = req.body;
+    const exists = await User.findOne({ $or: [{ username }, { email }] });
+    if (exists) return res.status(400).send('Username atau email telah digunakan');
 
-  if (users.find(u => u.username === username || u.email === email)) {
-    return res.status(400).send('Username atau email telah digunakan');
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newSeller = await User.create({
+      username,
+      email,
+      password: hashedPassword,
+      shop_name: shop_name || username,
+      role: 'seller'
+    });
+
+    req.session.user = { id: newSeller._id.toString(), username, role: 'seller', shop_name: newSeller.shop_name };
+    res.redirect('/seller/dashboard');
+  } catch (err) {
+    res.status(500).send('Registrasi gagal: ' + err.message);
   }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const newSeller = {
-    id: uuidv4(),
-    role: 'seller',
-    username,
-    email,
-    password: hashedPassword,
-    shop_name: shop_name || username,
-    avatar: '/uploads/avatars/default.png',
-    banner: '/uploads/banners/default.jpg',
-    balance: 0,
-    created_at: new Date().toISOString()
-  };
-
-  users.push(newSeller);
-  db.write('users', users);
-
-  req.session.user = newSeller;
-  res.redirect('/seller/dashboard');
 });
 
 app.get('/seller/login', (req, res) => res.render('seller-login'));
 app.post('/seller/login', async (req, res) => {
-  const { username, password } = req.body;
-  const users = db.read('users');
-  const user = users.find(u => (u.username === username || u.email === username) && u.role === 'seller');
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ $or: [{ username }, { email: username }], role: 'seller' });
 
-  if (!user || !(await bcrypt.compare(password, user.password))) {
-    return res.status(400).send('Kredensial login tidak valid');
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(400).send('Kredensial login tidak valid');
+    }
+
+    req.session.user = { id: user._id.toString(), username: user.username, role: 'seller', shop_name: user.shop_name };
+    res.redirect('/seller/dashboard');
+  } catch (err) {
+    res.status(500).send('Login error');
   }
-
-  req.session.user = user;
-  res.redirect('/seller/dashboard');
 });
 
 app.get('/seller/logout', (req, res) => {
@@ -556,119 +593,93 @@ app.get('/seller/logout', (req, res) => {
   res.redirect('/');
 });
 
-// Dashboard Seller
-app.get('/seller/dashboard', isSeller, (req, res) => {
-  const currentSeller = db.read('users').find(u => u.id === req.session.user.id);
-  const products = db.read('products').filter(p => p.seller_id === currentSeller.id);
-  const orders = db.read('orders').filter(o => o.seller_id === currentSeller.id && o.status === 'paid');
+app.get('/seller/dashboard', isSeller, async (req, res) => {
+  const seller = await User.findById(req.session.user.id).lean();
+  const products = await Product.find({ seller_id: seller._id }).lean();
+  const orders = await Order.find({ seller_id: seller._id, status: 'paid' }).lean();
 
-  res.render('seller-dashboard', { seller: currentSeller, products, orders });
+  res.render('seller-dashboard', { 
+    seller: { ...seller, id: seller._id.toString() }, 
+    products: products.map(p => ({ ...p, id: p._id.toString() })), 
+    orders 
+  });
 });
 
-// Update Profile & Banner Toko
-app.post('/seller/profile', isSeller, upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'banner', maxCount: 1 }]), (req, res) => {
-  const users = db.read('users');
-  const idx = users.findIndex(u => u.id === req.session.user.id);
-  if (idx !== -1) {
-    if (req.body.shop_name) users[idx].shop_name = req.body.shop_name;
-    if (req.files['avatar']) users[idx].avatar = `/uploads/avatars/${req.files['avatar'][0].filename}`;
-    if (req.files['banner']) users[idx].banner = `/uploads/banners/${req.files['banner'][0].filename}`;
+app.post('/seller/profile', isSeller, upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'banner', maxCount: 1 }]), async (req, res) => {
+  const updateData = {};
+  if (req.body.shop_name) updateData.shop_name = req.body.shop_name;
+  if (req.files['avatar']) updateData.avatar = `/uploads/avatars/${req.files['avatar'][0].filename}`;
+  if (req.files['banner']) updateData.banner = `/uploads/banners/${req.files['banner'][0].filename}`;
 
-    db.write('users', users);
-    req.session.user = users[idx];
+  await User.findByIdAndUpdate(req.session.user.id, updateData);
+  res.redirect('/seller/dashboard');
+});
+
+app.get('/seller/product/add', isSeller, (req, res) => res.render('seller-product-add'));
+app.post('/seller/product/add', isSeller, upload.fields([{ name: 'thumbnail', maxCount: 1 }, { name: 'digital_file', maxCount: 1 }]), async (req, res) => {
+  try {
+    const { title, price, discount_price, description, category } = req.body;
+    await Product.create({
+      seller_id: req.session.user.id,
+      title,
+      price: Number(price),
+      discount_price: discount_price ? Number(discount_price) : null,
+      description,
+      category,
+      thumbnail: `/uploads/thumbnails/${req.files['thumbnail'][0].filename}`,
+      file_url: `/uploads/digital_files/${req.files['digital_file'][0].filename}`,
+      file_original_name: req.files['digital_file'][0].originalname,
+      status: 'pending'
+    });
+    res.redirect('/seller/dashboard');
+  } catch (err) {
+    res.status(500).send('Upload produk gagal');
   }
+});
+
+app.get('/seller/product/delete/:id', isSeller, async (req, res) => {
+  await Product.deleteOne({ _id: req.params.id, seller_id: req.session.user.id });
   res.redirect('/seller/dashboard');
 });
 
-// Tambah Produk Digital (Otomatis status "pending" untuk ditinjau Admin)
-app.get('/seller/product/add', isSeller, (req, res) => res.render('seller-product-add', { product: null }));
-app.post('/seller/product/add', isSeller, upload.fields([{ name: 'thumbnail', maxCount: 1 }, { name: 'digital_file', maxCount: 1 }]), (req, res) => {
-  const { title, price, discount_price, description, category } = req.body;
-  if (!req.files['thumbnail'] || !req.files['digital_file']) {
-    return res.status(400).send('Thumbnail gambar dan File ZIP/Digital wajib diupload.');
-  }
-
-  const products = db.read('products');
-  const newProduct = {
-    id: uuidv4(),
-    seller_id: req.session.user.id,
-    title,
-    price: Number(price),
-    discount_price: discount_price ? Number(discount_price) : null,
-    description,
-    category: category || 'Web Scripts',
-    thumbnail: `/uploads/thumbnails/${req.files['thumbnail'][0].filename}`,
-    file_url: `/uploads/digital_files/${req.files['digital_file'][0].filename}`,
-    file_original_name: req.files['digital_file'][0].originalname,
-    status: 'pending', // Perlu di-approve Admin
-    created_at: new Date().toISOString()
-  };
-
-  products.push(newProduct);
-  db.write('products', products);
-  res.redirect('/seller/dashboard');
-});
-
-// Hapus Produk
-app.get('/seller/product/delete/:id', isSeller, (req, res) => {
-  let products = db.read('products');
-  products = products.filter(p => !(p.id === req.params.id && p.seller_id === req.session.user.id));
-  db.write('products', products);
-  res.redirect('/seller/dashboard');
-});
-
-// Penarikan Saldo (Withdraw Nevapedia)
+// Penarikan Saldo
 app.get('/seller/withdraw', isSeller, async (req, res) => {
-  const seller = db.read('users').find(u => u.id === req.session.user.id);
+  const seller = await User.findById(req.session.user.id).lean();
   let methods = { manual_methods: [], instant_methods: [] };
   try {
     const resp = await axios.get(`https://app.nevapedia.com/api/withdraw/methods?apikey=${NEVAPEDIA_KEY}`);
     methods = resp.data;
-  } catch (err) {
-    console.error('Error fetch withdraw methods:', err.message);
-  }
+  } catch (e){}
   res.render('seller-withdraw', { seller, methods });
 });
 
 app.post('/seller/withdraw', isSeller, async (req, res) => {
   const { amount, method, account_number, instant } = req.body;
-  const users = db.read('users');
-  const sellerIdx = users.findIndex(u => u.id === req.session.user.id);
-  const currentSeller = users[sellerIdx];
-
+  const seller = await User.findById(req.session.user.id);
   const wdAmount = Number(amount);
-  if (currentSeller.balance < wdAmount) {
-    return res.status(400).send('Saldo tidak mencukupi');
-  }
+
+  if (seller.balance < wdAmount) return res.status(400).send('Saldo tidak cukup');
 
   try {
-    const isInstant = instant === 'true';
-    const resp = await axios.get(
-      `https://app.nevapedia.com/api/withdraw?apikey=${NEVAPEDIA_KEY}&amount=${wdAmount}&method=${method}&account_number=${account_number}&instant=${isInstant}`
-    );
-
+    const resp = await axios.get(`https://app.nevapedia.com/api/withdraw?apikey=${NEVAPEDIA_KEY}&amount=${wdAmount}&method=${method}&account_number=${account_number}&instant=${instant === 'true'}`);
     if (resp.data.success) {
-      // Potong saldo
-      users[sellerIdx].balance -= wdAmount;
-      db.write('users', users);
-      req.session.user = users[sellerIdx];
-      return res.send(`<script>alert("Penarikan Berhasil Diajukan!"); window.location.href="/seller/dashboard";</script>`);
+      seller.balance -= wdAmount;
+      await seller.save();
+      res.send('<script>alert("Penarikan berhasil diajukan!"); window.location.href="/seller/dashboard";</script>');
     } else {
-      return res.status(400).send(resp.data.message || 'Gagal melakukan penarikan');
+      res.status(400).send(resp.data.message || 'Penarikan gagal');
     }
-  } catch (err) {
-    res.status(500).send('Kesalahan gateway penarikan: ' + err.message);
+  } catch (e) {
+    res.status(500).send('Error gateway: ' + e.message);
   }
 });
 
 /* ==========================================================
    ADMIN ROUTES
 ========================================================== */
-
 app.get('/admin/login', (req, res) => res.render('admin-login'));
 app.post('/admin/login', (req, res) => {
-  const { username, password } = req.body;
-  if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
+  if (req.body.username === process.env.ADMIN_USERNAME && req.body.password === process.env.ADMIN_PASSWORD) {
     req.session.isAdmin = true;
     return res.redirect('/admin/dashboard');
   }
@@ -676,51 +687,51 @@ app.post('/admin/login', (req, res) => {
 });
 
 app.get('/admin/dashboard', isAdmin, async (req, res) => {
-  const products = db.read('products');
-  const pendingProducts = products.filter(p => p.status === 'pending');
-  const users = db.read('users');
-  const reports = db.read('reports');
+  const pendingProducts = await Product.find({ status: 'pending' }).lean();
+  const users = await User.find().lean();
+  const reports = await Report.find().lean();
 
   let gatewayBalance = { balance: 0, pending_balance: 0 };
   try {
     const resp = await axios.get(`https://app.nevapedia.com/api/balance?apikey=${NEVAPEDIA_KEY}`);
     gatewayBalance = resp.data;
-  } catch (err) {
-    console.error('Nevapedia balance check error:', err.message);
-  }
+  } catch (e){}
 
-  res.render('admin-dashboard', { pendingProducts, users, reports, gatewayBalance });
+  res.render('admin-dashboard', { 
+    pendingProducts: pendingProducts.map(p => ({ ...p, id: p._id.toString() })), 
+    users: users.map(u => ({ ...u, id: u._id.toString() })), 
+    reports, 
+    gatewayBalance 
+  });
 });
 
-// Admin Approve / Reject Produk
-app.get('/admin/product/:id/status/:status', isAdmin, (req, res) => {
-  const { id, status } = req.params;
-  const products = db.read('products');
-  const prodIdx = products.findIndex(p => p.id === id);
-  if (prodIdx !== -1) {
-    products[prodIdx].status = status; // 'approved' atau 'rejected'
-    db.write('products', products);
+app.get('/admin/product/:id/status/:status', isAdmin, async (req, res) => {
+  await Product.findByIdAndUpdate(req.params.id, { status: req.params.status });
+  res.redirect('/admin/dashboard');
+});
+
+app.post('/admin/seller/:id/toggle-badge', isAdmin, async (req, res) => {
+  const seller = await User.findById(req.params.id);
+  if (seller) {
+    seller.is_verified = !seller.is_verified;
+    seller.verification_type = seller.is_verified ? 'admin_grant' : null;
+    await seller.save();
   }
   res.redirect('/admin/dashboard');
 });
 
-// Admin Lihat Laporan Pembeli
-app.get('/admin/reports', isAdmin, (req, res) => {
-  const reports = db.read('reports');
-  const products = db.read('products');
-  const users = db.read('users');
-
+app.get('/admin/reports', isAdmin, async (req, res) => {
+  const reports = await Report.find().populate('product_id').populate('seller_id').lean();
   const detailedReports = reports.map(r => ({
     ...r,
-    product: products.find(p => p.id === r.product_id) || {},
-    seller: users.find(u => u.id === r.seller_id) || {}
+    product: r.product_id || {},
+    seller: r.seller_id || {}
   }));
-
   res.render('admin-reports', { reports: detailedReports });
 });
 
 if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => console.log(`FROVIX SHOP running on http://localhost:${PORT}`));
+  app.listen(PORT, () => console.log(`🚀 FROVIX SHOP running on http://localhost:${PORT}`));
 }
 
 module.exports = app;
